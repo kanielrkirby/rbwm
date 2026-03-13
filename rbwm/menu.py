@@ -54,3 +54,22 @@ def select_from_menu(items, prompt="Select"):
     
     menu_cmd = CONFIG.get_menu_cmd()
     return select_from_menu_raw(menu_cmd, items, prompt)
+
+
+def prompt_for_input(prompt="Enter value"):
+    """Prompt for custom text input via menu (allows typing custom values)."""
+    from .config import CONFIG
+    
+    menu_cmd = CONFIG.get_menu_cmd()
+    cmd_template = MENU_CONFIGS.get(menu_cmd, {}).get("cmd", menu_cmd)
+    cmd = cmd_template.format(prompt=prompt)
+    
+    # Empty input allows user to type freely
+    result = subprocess.run(
+        cmd,
+        shell=True,
+        input="",
+        capture_output=True,
+        text=True
+    )
+    return result.stdout.strip() if result.returncode == 0 else None

@@ -6,8 +6,11 @@ Main entry point
 import sys
 from .config import CONFIG, ConfigError
 from .system import System
-from .menu import select_from_menu
-from .vault import ensure_unlocked, lock, sync, get_entries, get_entry_fields
+from .menu import select_from_menu, prompt_for_input
+from .vault import (
+    ensure_unlocked, lock, sync, get_entries, get_entry_fields,
+    add_entry, edit_entry, remove_entry
+)
 from .inject import type_text, press_tab, press_enter
 
 
@@ -64,6 +67,124 @@ def action_lock():
     lock()
 
 
+def action_add():
+    """Handle [Add] menu choice."""
+    from .password import password_menu
+    
+    new_entry = {"name": "", "username": "", "password": "", "uri": "", "folder": "", "notes": ""}
+    
+    while True:
+        fields = []
+        for k, v in new_entry.items():
+            if k == "password" and v:
+                fields.append(f"{k}: {'*' * len(v)}")
+            else:
+                fields.append(f"{k}: {v if v else '(empty)'}")
+        fields.append("[Save]")
+        fields.append("[Discard]")
+        
+        field_choice = select_from_menu(fields, "Add Entry - Select field to edit")
+        if not field_choice or field_choice == "[Discard]":
+            return
+        
+        if field_choice == "[Save]":
+            if not new_entry["name"]:
+                continue  # Need at least a name
+            add_entry(
+                new_entry["name"],
+                new_entry["username"],
+                new_entry["password"],
+                new_entry["uri"],
+                new_entry["folder"],
+                new_entry["notes"]
+            )
+            return
+        
+        field_name = field_choice.split(":")[0].strip()
+        
+        # Use password menu for password field
+        if field_name == "password":
+            value = password_menu()
+        else:
+            value = prompt_for_input(f"Enter {field_name}")
+        
+        if value is not None:
+            new_entry[field_name] = value
+
+
+def action_edit(entries):
+    """Handle [Edit] menu choice."""
+    from .vault import get_entry_data
+    from .password import password_menu
+    
+    login_entries = [e for e in entries if e.get("type") != "Note"]
+    entry = select_entry(login_entries, "Select entry to edit")
+    if not entry:
+        return
+    
+    # Get current data
+    data = get_entry_data(entry["name"])
+    entry_data = data.get("data", {}) or {}
+    edit_fields = {
+        "username": entry_data.get("username") or "",
+        "password": entry_data.get("password") or "",
+        "uri": entry_data.get("uris", [{}])[0].get("uri", "") if entry_data.get("uris") else "",
+        "folder": data.get("folder") or "",
+        "notes": data.get("notes") or ""
+    }
+    
+    while True:
+        fields = []
+        for k, v in edit_fields.items():
+            if k == "password" and v:
+                fields.append(f"{k}: {'*' * len(v)}")
+            else:
+                fields.append(f"{k}: {v if v else '(empty)'}")
+        fields.append("[Save]")
+        fields.append("[Discard]")
+        
+        field_choice = select_from_menu(fields, f"Edit {entry['name']} - Select field")
+        if not field_choice or field_choice == "[Discard]":
+            return
+        
+        if field_choice == "[Save]":
+            edit_entry(
+                entry["name"],
+                edit_fields["username"],
+                edit_fields["password"],
+                edit_fields["uri"],
+                edit_fields["folder"],
+                edit_fields["notes"]
+            )
+            return
+        
+        field_name = field_choice.split(":")[0].strip()
+        
+        # Use password menu for password field
+        if field_name == "password":
+            value = password_menu()
+        else:
+            current = edit_fields.get(field_name, "")
+            prompt_text = f"Enter {field_name}"
+            if current and len(current) <= 30:
+                prompt_text += f" (current: {current})"
+            elif current:
+                prompt_text += f" (current: {current[:30]}...)"
+            
+            value = prompt_for_input(prompt_text)
+        
+        if value is not None and value != "":
+            edit_fields[field_name] = value
+
+
+def action_remove(entries):
+    """Handle [Remove] menu choice."""
+    login_entries = [e for e in entries if e.get("type") != "Note"]
+    entry = select_entry(login_entries, "Select entry to remove")
+    if entry:
+        remove_entry(entry["name"])
+
+
 def action_autofill(entries, choice):
     """Handle direct entry selection for autofill."""
     from .vault import get_entry_data
@@ -108,6 +229,9 @@ def main():
             "[Details]": lambda: action_details(entries),
             "[Notes]": lambda: action_notes(entries),
             "[Sync]": action_sync,
+            "[Add]": action_add,
+            "[Edit]": lambda: action_edit(entries),
+            "[Remove]": lambda: action_remove(entries),
             "[Lock]": action_lock,
         }
         

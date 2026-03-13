@@ -51,6 +51,16 @@ class Config:
                         key, value = line.split("=", 1)
                         self._config[key.strip()] = value.strip()
         
+        # Set default password generation settings if not present
+        if "PASSWORD_LENGTH" not in self._config:
+            self._config["PASSWORD_LENGTH"] = "16"
+        if "PASSWORD_SPECIAL" not in self._config:
+            self._config["PASSWORD_SPECIAL"] = "true"
+        if "PASSWORD_NUMBERS" not in self._config:
+            self._config["PASSWORD_NUMBERS"] = "true"
+        if "PASSWORD_LETTERS" not in self._config:
+            self._config["PASSWORD_LETTERS"] = "true"
+        
         return self._config
     
     def get_menu_cmd(self):
@@ -127,6 +137,53 @@ class Config:
             return pinentry_cmd
         
         return configured
+    
+    def get_password_settings(self):
+        """Get password generation settings."""
+        return {
+            "length": int(self._config.get("PASSWORD_LENGTH", "16")),
+            "special": self._config.get("PASSWORD_SPECIAL", "true").lower() == "true",
+            "numbers": self._config.get("PASSWORD_NUMBERS", "true").lower() == "true",
+            "letters": self._config.get("PASSWORD_LETTERS", "true").lower() == "true",
+        }
+    
+    def save_password_settings(self, length, special, numbers, letters):
+        """Save password generation settings to config file."""
+        self._config["PASSWORD_LENGTH"] = str(length)
+        self._config["PASSWORD_SPECIAL"] = str(special).lower()
+        self._config["PASSWORD_NUMBERS"] = str(numbers).lower()
+        self._config["PASSWORD_LETTERS"] = str(letters).lower()
+        
+        # Re-read the config file and update it
+        lines = []
+        if self.config_file.exists():
+            with open(self.config_file) as f:
+                lines = f.readlines()
+        
+        # Update or add password settings
+        settings_keys = ["PASSWORD_LENGTH", "PASSWORD_SPECIAL", "PASSWORD_NUMBERS", "PASSWORD_LETTERS"]
+        updated_keys = set()
+        
+        for i, line in enumerate(lines):
+            if "=" in line and not line.strip().startswith("#"):
+                key = line.split("=", 1)[0].strip()
+                if key in settings_keys:
+                    lines[i] = f"{key}={self._config[key]}\n"
+                    updated_keys.add(key)
+        
+        # Add any missing settings
+        if updated_keys != set(settings_keys):
+            # Add them before the last line or at the end
+            new_lines = []
+            for key in settings_keys:
+                if key not in updated_keys:
+                    new_lines.append(f"{key}={self._config[key]}\n")
+            
+            if new_lines:
+                lines.extend(new_lines)
+        
+        with open(self.config_file, "w") as f:
+            f.writelines(lines)
     
     def _setup(self):
         """Run configuration wizard."""
@@ -259,6 +316,12 @@ MENU_CMD={menu_cmd}
 # Pinentry program for password prompts when unlocking vault
 # Options: pinentry-dmenu, pinentry-curses, pinentry-gnome3, pinentry-qt, pinentry
 PINENTRY_CMD={pinentry_cmd}
+
+# Password generation settings
+PASSWORD_LENGTH=16
+PASSWORD_SPECIAL=true
+PASSWORD_NUMBERS=true
+PASSWORD_LETTERS=true
 """
         
         with open(self.config_file, "w") as f:
@@ -356,6 +419,12 @@ MENU_CMD={menu_cmd}
 # Pinentry program for password prompts when unlocking vault
 # Options: pinentry-dmenu, pinentry-curses, pinentry-gnome3, pinentry-qt, pinentry
 PINENTRY_CMD={pinentry_cmd}
+
+# Password generation settings
+PASSWORD_LENGTH=16
+PASSWORD_SPECIAL=true
+PASSWORD_NUMBERS=true
+PASSWORD_LETTERS=true
 """
         
         with open(self.config_file, "w") as f:

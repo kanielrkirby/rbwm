@@ -113,3 +113,49 @@ def get_entry_fields(entry_name):
             fields.append({"display": display, "value": value})
     
     return fields
+
+
+def add_entry(name, username="", password="", uri="", folder="", notes=""):
+    """Add a new entry to the vault."""
+    add_input = password
+    if notes:
+        add_input += "\n" + notes
+    
+    cmd = ["rbw", "add", name]
+    if username:
+        cmd.append(username)
+    if folder:
+        cmd.extend(["--folder", folder])
+    if uri:
+        cmd.extend(["--uri", uri])
+    
+    result = subprocess.run(cmd, input=add_input, text=True, capture_output=True)
+    return result.returncode == 0
+
+
+def remove_entry(name):
+    """Remove an entry from the vault."""
+    result = subprocess.run(["rbw", "remove", name], capture_output=True)
+    return result.returncode == 0
+
+
+def edit_entry(name, username="", password="", uri="", folder="", notes=""):
+    """Edit an entry (rbw doesn't support direct edit, so remove and recreate)."""
+    # Remove old entry
+    subprocess.run(["rbw", "remove", name], capture_output=True)
+    
+    # Recreate with new values
+    add_input = password
+    if notes:
+        add_input += "\n" + notes
+    
+    cmd = ["rbw", "add", name]
+    if username:
+        cmd.append(username)
+    if folder:
+        cmd.extend(["--folder", folder])
+    if uri:
+        cmd.extend(["--uri", uri])
+    
+    result = subprocess.run(cmd, input=add_input, text=True, capture_output=True)
+    return result.returncode == 0
