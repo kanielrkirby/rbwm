@@ -26,15 +26,16 @@
             
             installPhase = ''
               mkdir -p $out/bin
-              mkdir -p $out/lib/rbwm
+              mkdir -p $out/lib
               
               # Copy Python package
               cp -r rbwm $out/lib/
               
-              # Create wrapper script
-              cat > $out/bin/rbwm << 'EOF'
+              # Create wrapper script with PYTHONPATH
+              cat > $out/bin/rbwm << EOF
               #!/usr/bin/env bash
-              exec ${pkgs.python3}/bin/python3 -m rbwm "$@"
+              export PYTHONPATH="$out/lib:\$PYTHONPATH"
+              exec ${pkgs.python3}/bin/python3 -m rbwm "\$@"
               EOF
               
               chmod +x $out/bin/rbwm
